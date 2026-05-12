@@ -337,6 +337,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .cc-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;}
 .cc-avatar.paciente{background:rgba(40,201,138,.15);color:var(--green);}
 .cc-avatar.medico{background:rgba(108,99,245,.15);color:var(--purple);}
+.cc-avatar.fisioterapeuta{background:rgba(61,168,232,.15);color:var(--blue);}
 .cc-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .cc-role{font-size:11px;color:var(--muted);margin-bottom:6px;min-height:0;}
 .cc-info{display:flex;flex-direction:column;gap:3px;}
@@ -345,6 +346,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .cc-type-badge{position:absolute;top:10px;right:10px;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;}
 .cc-type-paciente{background:rgba(40,201,138,.12);color:var(--green);}
 .cc-type-medico{background:rgba(108,99,245,.12);color:var(--purple);}
+.cc-type-fisioterapeuta{background:rgba(61,168,232,.12);color:var(--blue);}
 .contacts-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);padding:40px;}
 @media(max-width:600px){.contacts-grid{grid-template-columns:1fr;padding:12px;}}
 
@@ -436,6 +438,9 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
     </div>
     <div class="nav-item" id="cnav-medico" onclick="setContactNav('medico',this)">
       <span class="nav-icon">🟣</span> Médicos / Parceiros <span class="nav-badge" style="background:rgba(108,99,245,.2);color:var(--purple)" id="cbadge-medico">0</span>
+    </div>
+<div class="nav-item" id="cnav-fisioterapeuta" onclick="setContactNav('fisioterapeuta',this)">
+      <span class="nav-icon">🔵</span> Fisioterapeutas <span class="nav-badge" style="background:rgba(61,168,232,.2);color:var(--blue)" id="cbadge-fisioterapeuta">0</span>
     </div>
     <div class="sidebar-divider"></div>
     <div class="sidebar-section">Buscar</div>
@@ -656,7 +661,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
       <div class="form-field full"><label>Motivo de Procura</label><input id="nl-motivo" placeholder="Tontura, dor, quedas, pós-operatório..."></div>
       <div class="form-field"><label>Região / Bairro</label><input id="nl-regiao" placeholder="Bairro ou cidade"></div>
       <div class="form-field"><label>Fisioterapeuta</label>
-        <select id="nl-fisio"><option value="">—</option><option>Ana Paula Nascimento</option><option>Ana Paula Pinheiro</option><option>Carmeli</option><option>Francielle</option><option>Leidiane</option><option>Maria Victoria</option></select>
+        <select id="nl-fisio"><option value="">—</option></select>
       </div>
       <div class="form-field full"><label>Observações</label><textarea id="nl-obs" placeholder="Notas adicionais..."></textarea></div>
     </div>
@@ -678,6 +683,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
         <select id="nc-tipo">
           <option value="paciente">🟢 Paciente</option>
           <option value="medico">🟣 Médico / Parceiro</option>
+	<option value="fisioterapeuta">🔵 Fisioterapeuta</option>
         </select>
       </div>
       <div class="form-field"><label>Nome Completo *</label>
@@ -966,6 +972,11 @@ function selectLead(id){
       <div class="dp-field"><label>E-mail</label><input id="dp-email" type="email" value="${esc(l.email||'')}"></div>
       <div class="dp-field"><label>Região / Bairro</label><input id="dp-regiao" value="${esc(l.regiao||'')}"></div>
       <div class="dp-field"><label>Data do Contato</label><input type="date" id="dp-data" value="${(l.data||'').slice(0,10)}"></div>
+      <div class="dp-field"><label>Fisioterapeuta</label>
+        <select id="dp-fisio">
+          ${[''].concat(contacts.filter(c => c.tipo === 'fisioterapeuta').map(c => c.nome).sort()).map(o=>`<option ${l.fisio===o?'selected':''}>${o}</option>`).join('')}
+        </select>
+      </div>
     </div>
     <div class="dp-divider"></div>
     <div class="dp-section">
@@ -1247,10 +1258,12 @@ function updateContactBadges(){
   const all = contacts.length;
   const pac = contacts.filter(c=>c.tipo==='paciente').length;
   const med = contacts.filter(c=>c.tipo==='medico').length;
+  const fis = contacts.filter(c=>c.tipo==='fisioterapeuta').length;
   const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
   set('cbadge-all', all);
   set('cbadge-paciente', pac);
   set('cbadge-medico', med);
+  set('cbadge-fisioterapeuta', fis);
   const cc = document.getElementById('contactCount');
   if(cc) cc.innerHTML = `<b>${all}</b> contato${all!==1?'s':''}`;
 }
@@ -1357,6 +1370,7 @@ function renderContacts(){
 
   grid.innerHTML = list.map(c=>{
     const isPac = c.tipo==='paciente';
+    const isFisio = c.tipo==='fisioterapeuta';
     const initials = (c.nome||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
     const sel = c.id===selectedContactId?'selected':'';
     const chk = selectedContactIds.has(c.id)?'checked':'';
@@ -1369,12 +1383,12 @@ function renderContacts(){
     return `<div class="contact-card ${sel} ${bulkClass} ${checkedClass}" onclick="${clickAction}">
       ${bulkMode?`<input type="checkbox" class="cc-checkbox" ${chk} onclick="toggleContactCheck(event,${c.id})" />`:''}
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
-        <div class="cc-avatar ${isPac?'paciente':'medico'}">${initials}</div>
+        <div class="cc-avatar ${isPac?'paciente':isFisio?'fisioterapeuta':'medico'}">${initials}</div>
         <div style="flex:1;min-width:0;">
           <div class="cc-name" style="font-size:12px;">${esc(c.nome||'Sem nome')}</div>
           ${c.especialidade?`<div class="cc-role" style="font-size:10px;margin-bottom:0;">${esc(c.especialidade)}</div>`:''}
         </div>
-        <span class="cc-type-badge ${isPac?'cc-type-paciente':'cc-type-medico'}" style="position:static;font-size:9px;">${isPac?'Pac.':'Méd.'}</span>
+        <span class="cc-type-badge ${isPac?'cc-type-paciente':isFisio?'cc-type-fisioterapeuta':'cc-type-medico'}" style="position:static;font-size:9px;">${isPac?'Pac.':isFisio?'Fisio.':'Méd.'}</span>
       </div>
       <div class="cc-info" style="gap:2px;">
         ${c.tel?`<div class="cc-row" style="font-size:10px;">📱 <span>${esc(c.tel)}</span></div>`:''}
@@ -1436,8 +1450,9 @@ function selectContact(id){
       <div class="dp-section-title">Informações</div>
       <div class="dp-field"><label>Tipo</label>
         <select id="cdp-tipo">
-          <option value="paciente" ${isPac?'selected':''}>🟢 Paciente</option>
-          <option value="medico" ${!isPac?'selected':''}>🟣 Médico / Parceiro</option>
+          <option value="paciente" ${c.tipo==='paciente'?'selected':''}>🟢 Paciente</option>
+          <option value="medico" ${c.tipo==='medico'?'selected':''}>🟣 Médico / Parceiro</option>
+          <option value="fisioterapeuta" ${c.tipo==='fisioterapeuta'?'selected':''}>🔵 Fisioterapeuta</option>
         </select>
       </div>
       <div class="dp-field"><label>Nome</label><input id="cdp-nome" value="${esc(c.nome||'')}"></div>
@@ -1752,6 +1767,9 @@ function deleteLead(){
 
 // ═══════════════════════════ NOVO LEAD ═══════════════════════════
 function openNewLead(){
+  const fisios = contacts.filter(c => c.tipo === 'fisioterapeuta').map(c => c.nome).sort();
+  const options = '<option value="">—</option>' + fisios.map(f => `<option value="${f}">${esc(f)}</option>`).join('');
+  document.getElementById('nl-fisio').innerHTML = options;
   document.getElementById('nl-data').value = new Date().toISOString().slice(0,10);
   document.getElementById('modalNewLead').classList.add('open');
 }

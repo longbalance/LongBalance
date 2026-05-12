@@ -246,11 +246,14 @@ canvas{display:block;}
       🔄 Sincronizar Agora
     </button>
     <div class="year-tabs" id="yearTabs">
-      <button class="year-tab active" onclick="setYear('all')">Todos os Anos</button>
-      <button class="year-tab" onclick="setYear('2023')">2023</button>
-      <button class="year-tab" onclick="setYear('2024')">2024</button>
-      <button class="year-tab" onclick="setYear('2025')">2025</button>
-      <button class="year-tab" onclick="setYear('2026')">2026*</button>
+      <button class="year-tab active" id="btnAllYears" onclick="setYear('all')">Todos os Anos</button>
+      <select class="year-tab" id="selectYear" onchange="setYear(this.value)" style="outline:none;">
+        <option value="" disabled selected style="display:none">Selecione o Ano</option>
+        <option value="2023">2023</option>
+        <option value="2024">2024</option>
+        <option value="2025">2025</option>
+        <option value="2026">2026*</option>
+      </select>
     </div>
     <div class="tog-wrap" onclick="toggleTheme()">
       <span style="font-size:13px">🌙</span>
@@ -894,8 +897,10 @@ function applyLiveData(parsed, sourceLabel){
   st.textContent='✅ Dados ao vivo';st.className='ub-status ok';
   document.getElementById('dashFooter').textContent=`LongBalance · ${sourceLabel} · Processado em ${ts}`;
   currentYear='all';
-  document.querySelectorAll('.year-tab').forEach(t=>t.classList.remove('active'));
-  document.querySelector('.year-tab').classList.add('active');
+  const btnAll = document.getElementById('btnAllYears');
+  const selYear = document.getElementById('selectYear');
+  if(btnAll) btnAll.classList.add('active');
+  if(selYear) { selYear.classList.remove('active'); selYear.value = ''; }
   rebuildYearTabs(parsed);
   // clearBtn removed
   rebuildAll();
@@ -904,11 +909,11 @@ function applyLiveData(parsed, sourceLabel){
 function rebuildYearTabs(parsed){
   const tabs=document.getElementById('yearTabs');
   const years=Object.keys(parsed.byYear).filter(k=>k!=='all').sort();
-  while(tabs.children.length>1) tabs.removeChild(tabs.lastChild);
-  years.forEach(y=>{
-    const b=document.createElement('button');
-    b.className='year-tab';b.textContent=y;b.onclick=()=>setYear(y);tabs.appendChild(b);
-  });
+  tabs.innerHTML = `<button class="year-tab active" id="btnAllYears" onclick="setYear('all')">Todos os Anos</button>
+  <select class="year-tab" id="selectYear" onchange="setYear(this.value)" style="outline:none;">
+    <option value="" disabled selected style="display:none">Selecione o Ano</option>
+    ${years.map(y=>`<option value="${y}">${y}</option>`).join('')}
+  </select>`;
 }
 
 // ═══ DATA ACCESSOR ═══
@@ -1156,10 +1161,19 @@ function rebuildAll(){
 }
 function setYear(yr){
   currentYear=yr;
-  document.querySelectorAll('.year-tab').forEach(t=>{
-    const l=t.textContent.trim().replace('*','');
-    t.classList.toggle('active',yr==='all'?l==='Todos os Anos':l===yr);
-  });
+  const btnAll = document.getElementById('btnAllYears');
+  const selYear = document.getElementById('selectYear');
+  if(btnAll && selYear){
+    if(yr === 'all'){
+      btnAll.classList.add('active');
+      selYear.classList.remove('active');
+      selYear.value = '';
+    } else {
+      btnAll.classList.remove('active');
+      selYear.classList.add('active');
+      selYear.value = yr;
+    }
+  }
   // Atualiza gráfico de mês diretamente sem recriar tudo
   const {mesL, mesD, mesTitle} = getMesData(yr);
   document.getElementById('mesCardSub').textContent = mesTitle;
