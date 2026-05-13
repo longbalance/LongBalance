@@ -2015,12 +2015,16 @@ function doPost(e) {
 // ══════════════════════════════════════════════════════
 // GS STATE
 // ══════════════════════════════════════════════════════
-let gsUrl      = '';
+// Cole a sua URL gerada no Apps Script abaixo (terminada em /exec):
+const SCRIPT_URL_FIXA = 'https://script.google.com/macros/s/AKfycbwy7ZY0sPhR5QDGGiSJLF88qN2CyQQhBY7nXbMomvHHQOFVcJsXsLzrdxMkdm9DcjxSpQ/exec';
+
+let gsUrl      = SCRIPT_URL_FIXA;
 let gsSyncing  = false;
 let gsLastSync = null;
 
 function loadGSConfig(){
-  try{ gsUrl = localStorage.getItem(GS_URL_KEY) || ''; }catch(e){}
+  // Ignora a memória do navegador e força a usar a URL fixa do arquivo
+  gsUrl = SCRIPT_URL_FIXA; 
   if(gsUrl){
     document.getElementById('gsScriptUrl').value = gsUrl;
     updateSyncStatus('','');

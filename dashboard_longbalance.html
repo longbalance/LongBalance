@@ -31,6 +31,8 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:1
 .year-tab{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Inter',sans-serif;font-size:12px;font-weight:500;transition:all .18s;}
 .year-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .year-tab:hover:not(.active){border-color:var(--muted);color:var(--text);}
+.year-select{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;font-family:'Inter',sans-serif;font-size:12px;font-weight:500;outline:none;transition:all .18s;}
+.year-select:focus{border-color:var(--accent);}
 .tog-wrap{display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none;}
 .tog-track{width:36px;height:19px;border-radius:10px;background:var(--border);position:relative;transition:background .2s;}
 [data-theme="light"] .tog-track{background:var(--accent2);}
@@ -246,13 +248,9 @@ canvas{display:block;}
       🔄 Sincronizar Agora
     </button>
     <div class="year-tabs" id="yearTabs">
-      <button class="year-tab active" id="btnAllYears" onclick="setYear('all')">Todos os Anos</button>
-      <select class="year-tab" id="selectYear" onchange="setYear(this.value)" style="outline:none;">
-        <option value="" disabled selected style="display:none">Selecione o Ano</option>
-        <option value="2023">2023</option>
-        <option value="2024">2024</option>
-        <option value="2025">2025</option>
-        <option value="2026">2026*</option>
+      <button class="year-tab active" onclick="setYear('all')">Todos os Anos</button>
+      <select class="year-select" id="yearDropdown" onchange="setYearFromDropdown(this.value)" style="display:none;">
+        <option value="all">Todos os Anos</option>
       </select>
     </div>
     <div class="tog-wrap" onclick="toggleTheme()">
@@ -643,25 +641,58 @@ function parseWorkbook(wb){
       const Y=result.byYear[year];
       result.totalLeads++;
       // Track month from date cell or sheet name
-      {
-        let monthIdx=-1;
-        if(sheetYearOverride&&ci.data!==undefined){
-          const d=row[ci.data];
-          if(d instanceof Date) monthIdx=d.getMonth();
-          else if(typeof d==='number'&&d>10000){const dt=XLSX.SSF.parse_date_code(d);if(dt)monthIdx=dt.m-1;}
-        } else if(ci.data!==undefined){
-          const d=row[ci.data];
-          if(d instanceof Date) monthIdx=d.getMonth();
-          else if(typeof d==='number'&&d>10000){const dt=XLSX.SSF.parse_date_code(d);if(dt)monthIdx=dt.m-1;}
-        }
-        // Fallback: infer from sheet name month keyword
-        if(monthIdx<0){
-          const mn={'JAN':0,'FEV':1,'MAR':2,'ABR':3,'MAI':4,'JUN':5,'JUL':6,'AGO':7,'SET':8,'OUT':9,'NOV':10,'DEZ':11,
-                    'JANEIRO':0,'FEVEREIRO':1,'MARÇO':2,'ABRIL':3,'MAIO':4,'JUNHO':5,'JULHO':6,'AGOSTO':7,'SETEMBRO':8,'OUTUBRO':9,'NOVEMBRO':10,'DEZEMBRO':11};
-          for(const[k,v] of Object.entries(mn)){if(snUpper.includes(k)){monthIdx=v;break;}}
-        }
-        if(monthIdx>=0&&monthIdx<12) result.mesByYear[year][monthIdx]++;
+     // Track month correctly
+{
+  let monthIdx = -1;
+
+  // PRIORIDADE TOTAL: nome da aba
+  // Ex: JANEIRO2026, FEVEREIRO2026 etc.
+  const mn = {
+    'JANEIRO':0,'JAN':0,
+    'FEVEREIRO':1,'FEV':1,
+    'MARÇO':2,'MARCO':2,'MAR':2,
+    'ABRIL':3,'ABR':3,
+    'MAIO':4,'MAI':4,
+    'JUNHO':5,'JUN':5,
+    'JULHO':6,'JUL':6,
+    'AGOSTO':7,'AGO':7,
+    'SETEMBRO':8,'SET':8,
+    'OUTUBRO':9,'OUT':9,
+    'NOVEMBRO':10,'NOV':10,
+    'DEZEMBRO':11,'DEZ':11
+  };
+
+  for (const [k,v] of Object.entries(mn)) {
+    if (snUpper.includes(k)) {
+      monthIdx = v;
+      break;
+    }
+  }
+
+  // Se não encontrou no nome da aba,
+  // aí sim tenta pegar pela data
+  if(monthIdx < 0 && ci.data !== undefined){
+    const d = row[ci.data];
+
+    if(d instanceof Date){
+      monthIdx = d.getMonth();
+    }
+    else if(typeof d === 'number' && d > 10000){
+      const dt = XLSX.SSF.parse_date_code(d);
+      if(dt) monthIdx = dt.m - 1;
+    }
+    else if(typeof d === 'string'){
+      const m = d.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+      if(m){
+        monthIdx = parseInt(m[2],10) - 1;
       }
+    }
+  }
+
+  if(monthIdx >= 0 && monthIdx < 12){
+    result.mesByYear[year][monthIdx]++;
+  }
+}
 
       // Conversão
       if(ci.conv!==undefined){
@@ -897,23 +928,27 @@ function applyLiveData(parsed, sourceLabel){
   st.textContent='✅ Dados ao vivo';st.className='ub-status ok';
   document.getElementById('dashFooter').textContent=`LongBalance · ${sourceLabel} · Processado em ${ts}`;
   currentYear='all';
-  const btnAll = document.getElementById('btnAllYears');
-  const selYear = document.getElementById('selectYear');
-  if(btnAll) btnAll.classList.add('active');
-  if(selYear) { selYear.classList.remove('active'); selYear.value = ''; }
+  document.querySelectorAll('.year-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelector('.year-tab').classList.add('active');
   rebuildYearTabs(parsed);
   // clearBtn removed
   rebuildAll();
 }
 
 function rebuildYearTabs(parsed){
-  const tabs=document.getElementById('yearTabs');
   const years=Object.keys(parsed.byYear).filter(k=>k!=='all').sort();
-  tabs.innerHTML = `<button class="year-tab active" id="btnAllYears" onclick="setYear('all')">Todos os Anos</button>
-  <select class="year-tab" id="selectYear" onchange="setYear(this.value)" style="outline:none;">
-    <option value="" disabled selected style="display:none">Selecione o Ano</option>
-    ${years.map(y=>`<option value="${y}">${y}</option>`).join('')}
-  </select>`;
+  const dd = document.getElementById('yearDropdown');
+  if(!dd) return;
+  // Repovoar dropdown
+  dd.innerHTML = '<option value="all">Todos os Anos</option>';
+  years.forEach(y=>{
+    const opt=document.createElement('option');
+    opt.value=y; opt.textContent=y;
+    dd.appendChild(opt);
+  });
+  dd.value = currentYear;
+  // Mostrar dropdown se há anos, senão usar apenas o botão
+  dd.style.display = years.length > 0 ? 'inline-block' : 'none';
 }
 
 // ═══ DATA ACCESSOR ═══
@@ -1161,19 +1196,12 @@ function rebuildAll(){
 }
 function setYear(yr){
   currentYear=yr;
-  const btnAll = document.getElementById('btnAllYears');
-  const selYear = document.getElementById('selectYear');
-  if(btnAll && selYear){
-    if(yr === 'all'){
-      btnAll.classList.add('active');
-      selYear.classList.remove('active');
-      selYear.value = '';
-    } else {
-      btnAll.classList.remove('active');
-      selYear.classList.add('active');
-      selYear.value = yr;
-    }
-  }
+  // Botão "Todos os Anos" — sempre visível, ativo só quando 'all'
+  const allBtn = document.querySelector('.year-tab');
+  if(allBtn) allBtn.classList.toggle('active', yr==='all');
+  // Dropdown
+  const dd = document.getElementById('yearDropdown');
+  if(dd) dd.value = yr;
   // Atualiza gráfico de mês diretamente sem recriar tudo
   const {mesL, mesD, mesTitle} = getMesData(yr);
   document.getElementById('mesCardSub').textContent = mesTitle;
@@ -1186,6 +1214,10 @@ function setYear(yr){
   rebuildAll();
 }
 
+function setYearFromDropdown(yr){
+  setYear(yr);
+}
+
 function toggleNav(){
   const d = document.getElementById('navDropdown');
   d.classList.toggle('open');
@@ -1195,14 +1227,15 @@ document.addEventListener('click', e => {
   if(d && !d.contains(e.target)) d.classList.remove('open');
 });
 
-// ═══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
 // CRM GOOGLE SHEETS INTEGRATION
-// ═══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+const SCRIPT_URL_FIXA = 'https://script.google.com/macros/s/AKfycbwy7ZY0sPhR5QDGGiSJLF88qN2CyQQhBY7nXbMomvHHQOFVcJsXsLzrdxMkdm9DcjxSpQ/exec'; // <--- COLE SUA URL AQUI
 const CRM_URL_KEY = 'lb_crm_gs_url'; // mesma key usada pelo CRM
 
 function openCRMModal(){
   try{
-    const saved = localStorage.getItem(CRM_URL_KEY) || '';
+    const saved = SCRIPT_URL_FIXA;
     document.getElementById('crmScriptUrl').value = saved;
   }catch(e){}
   document.getElementById('modalCRM').classList.add('open');
@@ -1438,7 +1471,7 @@ function processLeadsFromCRM(leads){
 // Auto-sync on load if CRM URL is configured
 (function(){
   try{
-    const url = localStorage.getItem(CRM_URL_KEY);
+    const url = SCRIPT_URL_FIXA; // <--- Alterado para usar a URL fixa
     if(url){
       document.getElementById('crmScriptUrl').value = url;
       const btn = document.getElementById('crmSyncBtn');
